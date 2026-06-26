@@ -147,7 +147,12 @@
       await nextFrame();
       const styled = await applyCoverStyles(patched, '갑지', meta.coverRowRoles, meta.coverNCols);
 
-      outputBlob = new Blob([styled], {
+      statusTxt.textContent = '오전/오후 시트에 서식을 입히는 중…';
+      await nextFrame();
+      const dataSheetNames = meta.sheetMeta.map((s) => s.name);
+      const fullyStyled = await applyDataSheetStyles(styled, dataSheetNames);
+
+      outputBlob = new Blob([fullyStyled], {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       });
 
