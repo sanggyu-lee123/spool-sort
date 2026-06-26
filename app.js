@@ -133,11 +133,14 @@
           printArea,
         },
       };
-      // 오전/오후 등 데이터 시트도 가로 + 한 페이지 맞춤으로 동일하게 인쇄 설정
+      // 오전/오후 등 데이터 시트는 가로(열)만 한 페이지에 맞추고, 세로(행)는 필요한 만큼
+      // 여러 페이지로 자연스럽게 넘어가도록 설정 (내용이 잘리거나 글자가 과하게 축소되지 않게)
       meta.sheetMeta.forEach((s) => {
         printSettings[s.name] = {
           orientation: 'landscape',
           fitToPage: true,
+          fitToWidth: true,
+          fitToHeight: false,
           printArea: s.printArea || undefined,
         };
       });

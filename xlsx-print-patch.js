@@ -56,7 +56,16 @@ async function applyPrintSettings(xlsxArrayBuffer, sheetSettingsByName) {
     const marginsXml = `<pageMargins left="${margins.left}" right="${margins.right}" top="${margins.top}" bottom="${margins.bottom}" header="${margins.header}" footer="${margins.footer}"/>`;
 
     const orientation = settings.orientation || 'portrait';
-    const fitW = settings.fitToPage ? ' fitToWidth="1" fitToHeight="1"' : '';
+    // fitToWidth/fitToHeight: 0 means "as many pages as needed" (unbounded) in OOXML.
+    // Defaults: width fits to 1 page; height only fits to 1 page if explicitly requested
+    // (fitToPageHeight !== false) — otherwise height is left unbounded so a tall sheet
+    // spills onto multiple pages instead of being squeezed/shrunk to fit one page tall.
+    let fitW = '';
+    if (settings.fitToPage) {
+      const fitWidth = settings.fitToWidth !== false ? 1 : 0;
+      const fitHeight = settings.fitToHeight === false ? 0 : (settings.fitToHeight || 1);
+      fitW = ` fitToWidth="${fitWidth}" fitToHeight="${fitHeight}"`;
+    }
     const pageSetupXml = `<pageSetup orientation="${orientation}"${fitW}/>`;
     const insertion = `${marginsXml}${pageSetupXml}`;
 

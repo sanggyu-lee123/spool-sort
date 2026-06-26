@@ -46,7 +46,7 @@ async function applyDataSheetStyles(xlsxArrayBuffer, sheetNames) {
     title: '<font><b/><sz val="24"/><color theme="1"/><name val="맑은 고딕"/></font>',
     sub: '<font><b/><sz val="12"/><color theme="1"/><name val="맑은 고딕"/></font>',
     headerBold: '<font><b/><sz val="11"/><color theme="1"/><name val="맑은 고딕"/></font>',
-    bodyNormal: '<font><sz val="11"/><color theme="1"/><name val="맑은 고딕"/></font>',
+    bodyNormal: '<font><sz val="10"/><color theme="1"/><name val="맑은 고딕"/></font>',
     footerBold: '<font><b/><sz val="11"/><color theme="1"/><name val="맑은 고딕"/></font>',
   };
   const fontKeys = Object.keys(fonts);
@@ -76,7 +76,7 @@ async function applyDataSheetStyles(xlsxArrayBuffer, sheetNames) {
     ['sub', fontIdOf.sub, 0, 0, 'left', false],
     ['headerBarTop', fontIdOf.headerBold, grayFillId, dividerBorderId, 'center', true], // row 4 — adds the divider line under it
     ['headerBarBottom', fontIdOf.headerBold, grayFillId, 0, 'center', true], // row 5 — no extra border (divider already drawn above by row 4)
-    ['dataCell', fontIdOf.bodyNormal, 0, thinBorderId, 'center', false],
+    ['dataCell', fontIdOf.bodyNormal, 0, thinBorderId, 'center', true],
     ['footer', fontIdOf.footerBold, 0, 0, 'left', false],
   ];
   const xfIndexOf = {};
