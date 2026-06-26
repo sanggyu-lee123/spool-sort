@@ -160,6 +160,19 @@ function processWorkbook(XLSX, arrayBuffer) {
   };
 }
 
+/** Trim a SheetJS '!cols' array down to the columns actually in use.
+ *  SheetJS expands a single "remaining columns" range (e.g. col 15~16384)
+ *  read from the source file into one array entry PER COLUMN, which then
+ *  gets written back out as one <col> XML tag per entry — ballooning the
+ *  file to hundreds of KB per sheet for no visual benefit. We only need
+ *  the handful of columns the template actually uses (well beyond
+ *  DATA_COLS/K to be safe), so anything past that is dropped. */
+const MAX_TEMPLATE_COLS = 20;
+function trimCols(cols) {
+  if (!cols) return cols;
+  return cols.slice(0, MAX_TEMPLATE_COLS).map((c) => Object.assign({}, c));
+}
+
 /** Clone a worksheet's structure (merges, col widths, row heights, header cells, styles)
  *  but leave data rows (6..15) empty, ready to be filled. */
 function cloneSheetTemplate(XLSX, templateWs) {
@@ -171,7 +184,7 @@ function cloneSheetTemplate(XLSX, templateWs) {
   });
   if (templateWs['!ref']) newWs['!ref'] = templateWs['!ref'];
   if (templateWs['!merges']) newWs['!merges'] = templateWs['!merges'].map((m) => Object.assign({}, m));
-  if (templateWs['!cols']) newWs['!cols'] = templateWs['!cols'].map((c) => Object.assign({}, c));
+  if (templateWs['!cols']) newWs['!cols'] = trimCols(templateWs['!cols']);
   if (templateWs['!rows']) newWs['!rows'] = templateWs['!rows'].map((r) => (r ? Object.assign({}, r) : r));
 
   // clear data rows 6..15 across the relevant columns (including No. column B)
