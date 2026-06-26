@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>SPOOL 서명지 정렬 · 갑지 자동생성</title>
+<meta name="theme-color" content="#1f3864">
+<link rel="manifest" href="manifest.json">
+<style>
+  :root {
+    --navy: #1f3864;
+    --navy-light: #2e4d82;
+    --accent: #d97b29;
+    --bg: #f4f5f7;
+    --card: #ffffff;
+    --ink: #1b1f27;
+    --ink-soft: #5b6472;
+    --line: #e1e4e9;
+    --ok: #1f7a4d;
+    --err: #b3331d;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", -apple-system, sans-serif;
+    -webkit-text-size-adjust: 100%;
+  }
+  .wrap {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 20px 16px 48px;
+  }
+  header.top {
+    padding: 28px 4px 20px;
+  }
+  header.top .eyebrow {
+    font-size: 12.5px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  header.top h1 {
+    font-size: 23px;
+    margin: 0 0 6px;
+    color: var(--navy);
+    line-height: 1.35;
+    letter-spacing: -0.01em;
+  }
+  header.top p {
+    margin: 0;
+    color: var(--ink-soft);
+    font-size: 14px;
+    line-height: 1.55;
+  }
+
+  .steps {
+    display: flex;
+    gap: 6px;
+    margin: 18px 4px 0;
+  }
+  .steps .dot {
+    flex: 1;
+    height: 4px;
+    border-radius: 4px;
+    background: var(--line);
+    transition: background .25s;
+  }
+  .steps .dot.active { background: var(--navy); }
+  .steps .dot.done { background: var(--accent); }
+
+  .card {
+    background: var(--card);
+    border-radius: var(--radius);
+    border: 1px solid var(--line);
+    padding: 22px;
+    margin-top: 16px;
+    box-shadow: 0 1px 2px rgba(20,30,50,0.04);
+  }
+
+  .dropzone {
+    border: 2px dashed #c7cedb;
+    border-radius: var(--radius);
+    padding: 36px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
+    background: #fafbfc;
+  }
+  .dropzone.drag {
+    border-color: var(--navy);
+    background: #eef2fa;
+  }
+  .dropzone .icon {
+    width: 52px; height: 52px;
+    margin: 0 auto 14px;
+    color: var(--navy);
+  }
+  .dropzone .main-txt {
+    font-size: 15.5px;
+    font-weight: 600;
+    color: var(--ink);
+    margin-bottom: 4px;
+  }
+  .dropzone .sub-txt {
+    font-size: 13px;
+    color: var(--ink-soft);
+  }
+  input[type=file] { display: none; }
+
+  .file-chip {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: #fafbfc;
+  }
+  .file-chip .ic {
+    width: 36px; height: 36px;
+    flex-shrink: 0;
+    border-radius: 9px;
+    background: var(--navy);
+    color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .file-chip .name { font-size: 14px; font-weight: 600; flex: 1; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .file-chip .remove {
+    border: none; background: none; color: var(--ink-soft);
+    font-size: 20px; line-height: 1; cursor: pointer; padding: 4px 6px;
+  }
+
+  button.primary {
+    width: 100%;
+    margin-top: 18px;
+    padding: 15px 18px;
+    background: var(--navy);
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    font-size: 15.5px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background .15s, transform .1s;
+  }
+  button.primary:active { transform: scale(0.99); }
+  button.primary:disabled { background: #aab4c4; cursor: not-allowed; }
+  button.primary.loading { background: var(--navy-light); }
+
+  button.ghost {
+    width: 100%;
+    margin-top: 10px;
+    padding: 13px 18px;
+    background: transparent;
+    color: var(--navy);
+    border: 1.5px solid var(--navy);
+    border-radius: 12px;
+    font-size: 14.5px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .summary-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 4px;
+  }
+  .summary-box {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 14px 16px;
+    background: #fafbfc;
+  }
+  .summary-box .lbl {
+    font-size: 12px;
+    color: var(--ink-soft);
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .summary-box .val {
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--navy);
+  }
+  .summary-box .sub {
+    font-size: 12px;
+    color: var(--ink-soft);
+    margin-top: 2px;
+  }
+
+  .sheet-list {
+    margin-top: 14px;
+    border-top: 1px solid var(--line);
+    padding-top: 12px;
+  }
+  .sheet-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 7px 2px;
+    font-size: 13.5px;
+  }
+  .sheet-row .tag {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: #eef2fa;
+    color: var(--navy);
+    margin-right: 8px;
+  }
+  .sheet-row .cnt { color: var(--ink-soft); }
+
+  .status {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    color: var(--ink-soft);
+    margin-top: 14px;
+  }
+  .spinner {
+    width: 18px; height: 18px;
+    border: 2.5px solid #d6dbe3;
+    border-top-color: var(--navy);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .error-box {
+    background: #fdecea;
+    border: 1px solid #f3c5bd;
+    color: var(--err);
+    border-radius: 12px;
+    padding: 14px 16px;
+    font-size: 13.5px;
+    margin-top: 14px;
+    line-height: 1.5;
+  }
+
+  .success-box {
+    background: #eaf7ef;
+    border: 1px solid #b9e3c6;
+    color: var(--ok);
+    border-radius: 12px;
+    padding: 14px 16px;
+    font-size: 13.5px;
+    margin-top: 14px;
+    line-height: 1.5;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+
+  .rules-toggle {
+    margin-top: 18px;
+    text-align: center;
+  }
+  .rules-toggle button {
+    border: none;
+    background: none;
+    color: var(--ink-soft);
+    font-size: 12.5px;
+    text-decoration: underline;
+    cursor: pointer;
+    padding: 6px;
+  }
+  .rules-panel {
+    display: none;
+    margin-top: 10px;
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    line-height: 1.7;
+    background: #fafbfc;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 14px 16px;
+  }
+  .rules-panel.open { display: block; }
+  .rules-panel b { color: var(--ink); }
+  .rules-panel .ord {
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    font-size: 12px;
+    color: var(--navy);
+  }
+
+  footer.foot {
+    text-align: center;
+    color: #9aa3b0;
+    font-size: 11.5px;
+    margin-top: 28px;
+    line-height: 1.6;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="eyebrow">SPOOL Tools</div>
+    <h1>서명지 정렬 &amp; 갑지 자동생성</h1>
+    <p>오전·오후 서명지를 업체별로 정렬하고, 10건씩 시트를 나누고, 집계 갑지까지 한 번에 만들어 드립니다. 변환은 이 기기 안에서만 처리되고 서버로 전송되지 않습니다.</p>
+  </header>
+
+  <div class="steps">
+    <div class="dot" data-step="1"></div>
+    <div class="dot" data-step="2"></div>
+    <div class="dot" data-step="3"></div>
+  </div>
+
+  <!-- STEP 1: upload -->
+  <div class="card" id="uploadCard">
+    <div class="dropzone" id="dropzone">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+        <path d="M12 3v12m0-12 4 4m-4-4-4 4" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M5 17v2a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <div class="main-txt">엑셀 파일을 올려주세요</div>
+      <div class="sub-txt">탭하거나 파일을 끌어다 놓으세요 (.xlsx)</div>
+    </div>
+    <input type="file" id="fileInput" accept=".xlsx">
+
+    <div id="fileChipHolder" style="display:none; margin-top:14px;">
+      <div class="file-chip">
+        <div class="ic">XLS</div>
+        <div class="name" id="fileName"></div>
+        <button class="remove" id="removeFile" aria-label="제거">&times;</button>
+      </div>
+    </div>
+
+    <button class="primary" id="convertBtn" disabled>변환 시작</button>
+
+    <div class="status" id="statusBox" style="display:none;">
+      <div class="spinner"></div>
+      <span id="statusTxt">변환 중…</span>
+    </div>
+
+    <div class="error-box" id="errorBox" style="display:none;"></div>
+  </div>
+
+  <!-- STEP 2: result -->
+  <div class="card" id="resultCard" style="display:none;">
+    <div class="success-box">
+      <span>✅</span>
+      <span>변환이 끝났습니다. 아래 파일을 다운로드해서 엑셀로 열면 바로 인쇄할 수 있어요. 갑지는 가로 방향, 한 페이지 맞춤으로 설정되어 있습니다.</span>
+    </div>
+
+    <div class="summary-grid" id="summaryGrid"></div>
+
+    <div class="sheet-list" id="sheetList"></div>
+
+    <button class="primary" id="downloadBtn">엑셀 파일 다운로드</button>
+    <button class="ghost" id="resetBtn">다른 파일 변환하기</button>
+  </div>
+
+  <div class="rules-toggle">
+    <button id="rulesToggleBtn">정렬·집계 기준 보기</button>
+  </div>
+  <div class="rules-panel" id="rulesPanel">
+    <p><b>1. 시트 합산</b> — "오전" 계열 시트(오전, 오전 (2)…)와 "오후" 계열 시트를 각각 하나로 모읍니다.</p>
+    <p><b>2. 정렬 기준</b><br>
+      신청업체 1차: <span class="ord">최형재팀 → 박인기팀 → 유성완팀 → 연호 → 하나기술 → 엘테크 → 엘테크(SGAS) → 연호(사외) → 하나기술(사외)</span><br>
+      구분 2차: <span class="ord">GAS → PCW → 구조관 → 코팅배관 → SPIRAL → PVC → 서포트</span><br>
+      목록에 없는 업체·구분은 맨 뒤로 정렬됩니다.</p>
+    <p><b>3. 시트 분할</b> — 정렬된 목록을 10건 단위로 새 시트(오전, 오전 (2), …)에 다시 채웁니다.</p>
+    <p><b>4. 갑지 집계</b> — 업체 × 구분별 포장개수 합계표를 만듭니다. "엘테크"와 "엘테크(SGAS)"는 갑지에서 하나로 합산됩니다. 목록 밖의 항목은 "기타" 행/열로 집계됩니다.</p>
+  </div>
+
+  <footer class="foot">
+    원본 파일과 서식(글꼴·테두리·배경색)은 최대한 보존되며,<br>
+    숫자·셀 구조 위주로 만들어졌습니다. 변환 결과는 항상 다운로드 전 미리 확인해 주세요.
+  </footer>
+</div>
+
+<script src="vendor/xlsx.full.min.js"></script>
+<script src="vendor/jszip.min.js"></script>
+<script src="convert-engine.js"></script>
+<script src="xlsx-print-patch.js"></script>
+<script src="app.js"></script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').catch(() => {});
+    });
+  }
+</script>
+</body>
+</html>
