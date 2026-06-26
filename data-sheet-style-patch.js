@@ -65,7 +65,7 @@ async function applyDataSheetStyles(xlsxArrayBuffer, sheetNames) {
   const thinBorderId = borderStart;
   const newThinBorderXml = '<border><left style="thin"><color rgb="FF808080"/></left><right style="thin"><color rgb="FF808080"/></right><top style="thin"><color rgb="FF808080"/></top><bottom style="thin"><color rgb="FF808080"/></bottom><diagonal/></border>';
   const dividerBorderId = borderStart + 1;
-  const newDividerBorderXml = '<border><left/><right/><top/><bottom style="medium"><color rgb="FF595959"/></bottom><diagonal/></border>';
+  const newDividerBorderXml = '<border><left/><right/><top/><bottom style="thin"><color rgb="FF999999"/></bottom><diagonal/></border>';
   stylesXml = stylesXml.replace(/<borders count="(\d+)">/, (full, n) => `<borders count="${parseInt(n, 10) + 2}">`);
   stylesXml = stylesXml.replace('</borders>', `${newThinBorderXml}${newDividerBorderXml}</borders>`);
 
@@ -101,6 +101,14 @@ async function applyDataSheetStyles(xlsxArrayBuffer, sheetNames) {
   // instead of a date. Skip any column in row 2 other than the label column (B).
   const ROW2_ONLY_COLS = new Set(['B']);
 
+  // 4행/5행은 병합으로 가려진 가운데 칸(C~J)에 원래 빈 값이라 <c> 엘리먼트 자체가
+  // 없는 경우가 많다. 그런 칸은 새로 만들어 끼워 넣어야 테두리/배경이 전체 폭에 끊김
+  // 없이 이어진다. FULL_WIDTH_COLS는 그 보강 대상이 되는 행 번호 -> 적용할 열 범위.
+  const FULL_WIDTH_ROWS = {
+    4: ['B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K'],
+    5: ['B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K'],
+  };
+
   // ---- 2. patch each requested sheet's worksheet XML ----
   for (const sheetName of sheetNames) {
     const idx = sheetNameToIndex[sheetName];
@@ -115,11 +123,52 @@ async function applyDataSheetStyles(xlsxArrayBuffer, sheetNames) {
       const role = ROLE_BY_ROW[rowNum];
       if (!role) return full;
       const xfIdx = xfIndexOf[role];
-      const newInner = inner.replace(/<c r="([A-Z]+)(\d+)"([^>]*)>/g, (cfull, colLetters, rRow, cAttrs) => {
-        if (rowNum === 2 && !ROW2_ONLY_COLS.has(colLetters)) return cfull; // keep date cell's own format
-        const cleanedAttrs = cAttrs.replace(/\s*s="\d+"/, '');
-        return `<c r="${colLetters}${rRow}"${cleanedAttrs} s="${xfIdx}">`;
+
+      const fullWidthCols = FULL_WIDTH_ROWS[rowNum];
+      if (!fullWidthCols) {
+        // simple case: only restyle <c> tags that already exist
+        const newInner = inner.replace(/<c r="([A-Z]+)(\d+)"([^>]*)>/g, (cfull, colLetters, rRow, cAttrs) => {
+          if (rowNum === 2 && !ROW2_ONLY_COLS.has(colLetters)) return cfull; // keep date cell's own format
+          const cleanedAttrs = cAttrs.replace(/\s*s="\d+"/, '');
+          return `<c r="${colLetters}${rRow}"${cleanedAttrs} s="${xfIdx}">`;
+        });
+        return `<row r="${rowNumStr}"${rowAttrs}>${newInner}</row>`;
+      }
+
+      // full-width case (row 4 / row 5): build a complete cell map across the
+      // entire column range so the gray bar / divider line has no gaps, even for
+      // columns that had no <c> element at all in the original (merged, empty) cell.
+      const cellTokenRegex = /<c r="([A-Z]+)(\d+)"([^>]*?)\/>|<c r="([A-Z]+)(\d+)"([^>]*?)>([\s\S]*?)<\/c>/g;
+      const existing = {}; // colLetter -> {attrs, body|null} body=null means self-closing
+      let cm;
+      while ((cm = cellTokenRegex.exec(inner)) !== null) {
+        if (cm[1] !== undefined) {
+          existing[cm[1]] = { attrs: cm[3], body: null };
+        } else {
+          existing[cm[4]] = { attrs: cm[6], body: cm[7] };
+        }
+      }
+
+      const rebuilt = fullWidthCols.map((col) => {
+        const addr = `${col}${rowNumStr}`;
+        const cell = existing[col];
+        if (!cell) {
+          return `<c r="${addr}" s="${xfIdx}"/>`;
+        }
+        const cleanedAttrs = cell.attrs.replace(/\s*s="\d+"/, '');
+        if (cell.body === null) {
+          return `<c r="${addr}"${cleanedAttrs} s="${xfIdx}"/>`;
+        }
+        return `<c r="${addr}"${cleanedAttrs} s="${xfIdx}">${cell.body}</c>`;
+      }).join('');
+
+      // anything in `inner` outside our full-width column range (shouldn't normally
+      // happen for rows 4/5 in this template, but kept for safety) is preserved as-is.
+      let strippedInner = inner.replace(cellTokenRegex, (full2, sc1, sr1, sa1, pc1, pr1, pa1) => {
+        const col = sc1 !== undefined ? sc1 : pc1;
+        return fullWidthCols.includes(col) ? '' : full2;
       });
+      const newInner = rebuilt + strippedInner;
       return `<row r="${rowNumStr}"${rowAttrs}>${newInner}</row>`;
     });
 
