@@ -143,7 +143,11 @@
       });
       const patched = await applyPrintSettings(rawOut, printSettings);
 
-      outputBlob = new Blob([patched], {
+      statusTxt.textContent = '갑지에 서식을 입히는 중…';
+      await nextFrame();
+      const styled = await applyCoverStyles(patched, '갑지', meta.coverRowRoles, meta.coverNCols);
+
+      outputBlob = new Blob([styled], {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       });
 
