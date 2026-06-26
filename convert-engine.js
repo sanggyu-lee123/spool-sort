@@ -139,7 +139,7 @@ function processWorkbook(XLSX, arrayBuffer) {
       const chunk = rows.slice(i * PER_SHEET, (i + 1) * PER_SHEET);
       writeDataRows(newWs, chunk);
       XLSX.utils.book_append_sheet(newWb, newWs, newName);
-      sheetMeta.push({ period: p, name: newName });
+      sheetMeta.push({ period: p, name: newName, printArea: newWs['!ref'] || null });
     }
   });
 
@@ -363,6 +363,16 @@ function buildCoverSheet(XLSX, periodOrder, periodRows, templateInfo) {
     ...COVER_CATEGORY_COLS.map(() => ({ wch: 10.5 })),
     { wch: 10.5 },
   ];
+
+  // 숫자 셀: 0은 "-"로 표시 (수량 칸이 0으로 가득해서 읽기 불편한 것을 방지)
+  const numFmt = '#,##0;-#,##0;"-"';
+  Object.keys(ws).forEach((addr) => {
+    if (addr[0] === '!') return;
+    const cell = ws[addr];
+    if (cell && cell.t === 'n') {
+      cell.z = numFmt;
+    }
+  });
 
   const lastRow = aoa.length; // 1-indexed last row used
   const lastColLetter = XLSX.utils.encode_col(NCOLS - 1);

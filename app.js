@@ -126,13 +126,22 @@
       await nextFrame();
       const coverWs = workbook.Sheets['갑지'];
       const printArea = coverWs['!ref'] || 'A1:J28';
-      const patched = await applyPrintSettings(rawOut, {
+      const printSettings = {
         '갑지': {
           orientation: 'landscape',
           fitToPage: true,
           printArea,
         },
+      };
+      // 오전/오후 등 데이터 시트도 가로 + 한 페이지 맞춤으로 동일하게 인쇄 설정
+      meta.sheetMeta.forEach((s) => {
+        printSettings[s.name] = {
+          orientation: 'landscape',
+          fitToPage: true,
+          printArea: s.printArea || undefined,
+        };
       });
+      const patched = await applyPrintSettings(rawOut, printSettings);
 
       outputBlob = new Blob([patched], {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
