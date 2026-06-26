@@ -58,9 +58,21 @@ async function applyPrintSettings(xlsxArrayBuffer, sheetSettingsByName) {
     const orientation = settings.orientation || 'portrait';
     const fitW = settings.fitToPage ? ' fitToWidth="1" fitToHeight="1"' : '';
     const pageSetupXml = `<pageSetup orientation="${orientation}"${fitW}/>`;
+    const insertion = `${marginsXml}${pageSetupXml}`;
 
-    if (/<\/worksheet>/.test(xml)) {
-      xml = xml.replace('</worksheet>', `${marginsXml}${pageSetupXml}</worksheet>`);
+    // OOXML requires a strict child element order inside <worksheet>. pageMargins/pageSetup
+    // must come BEFORE elements like headerFooter, rowBreaks, colBreaks, customProperties,
+    // cellWatches, ignoredErrors, smartTags, drawing, tableParts, extLst — inserting blindly
+    // right before </worksheet> can land AFTER one of those (most commonly <ignoredErrors>,
+    // which SheetJS adds whenever a numeric-looking string is stored as text) and produce a
+    // file that lenient readers (LibreOffice, openpyxl) tolerate but real Excel rejects with
+    // a "needs repair" prompt. Insert before the first such trailing element if present.
+    const trailingTagPattern = /<(ignoredErrors|headerFooter|rowBreaks|colBreaks|customProperties|cellWatches|smartTags|drawing|legacyDrawing|legacyDrawingHF|picture|oleObjects|controls|webPublishItems|tableParts|extLst)[ >]/;
+    const trailingMatch = xml.match(trailingTagPattern);
+    if (trailingMatch) {
+      xml = xml.slice(0, trailingMatch.index) + insertion + xml.slice(trailingMatch.index);
+    } else if (/<\/worksheet>/.test(xml)) {
+      xml = xml.replace('</worksheet>', `${insertion}</worksheet>`);
     }
 
     zip.file(sheetPath, xml);
