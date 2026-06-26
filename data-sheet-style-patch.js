@@ -61,26 +61,30 @@ async function applyDataSheetStyles(xlsxArrayBuffer, sheetNames) {
   stylesXml = stylesXml.replace(/<fills count="(\d+)">/, (full, n) => `<fills count="${parseInt(n, 10) + 1}">`);
   stylesXml = stylesXml.replace('</fills>', `${newFillsXml}</fills>`);
 
-  // -- borders: thin grid for data cells --
+  // -- borders: thin grid for data cells, medium divider under the 불출/수령 label bar --
   const thinBorderId = borderStart;
-  const newBordersXml = '<border><left style="thin"><color rgb="FF808080"/></left><right style="thin"><color rgb="FF808080"/></right><top style="thin"><color rgb="FF808080"/></top><bottom style="thin"><color rgb="FF808080"/></bottom><diagonal/></border>';
-  stylesXml = stylesXml.replace(/<borders count="(\d+)">/, (full, n) => `<borders count="${parseInt(n, 10) + 1}">`);
-  stylesXml = stylesXml.replace('</borders>', `${newBordersXml}</borders>`);
+  const newThinBorderXml = '<border><left style="thin"><color rgb="FF808080"/></left><right style="thin"><color rgb="FF808080"/></right><top style="thin"><color rgb="FF808080"/></top><bottom style="thin"><color rgb="FF808080"/></bottom><diagonal/></border>';
+  const dividerBorderId = borderStart + 1;
+  const newDividerBorderXml = '<border><left/><right/><top/><bottom style="medium"><color rgb="FF595959"/></bottom><diagonal/></border>';
+  stylesXml = stylesXml.replace(/<borders count="(\d+)">/, (full, n) => `<borders count="${parseInt(n, 10) + 2}">`);
+  stylesXml = stylesXml.replace('</borders>', `${newThinBorderXml}${newDividerBorderXml}</borders>`);
 
   // -- cellXfs combos --
   const xfDefs = [
-    // [key, fontId, fillId, borderId, align]
-    ['title', fontIdOf.title, 0, 0, 'center'],
-    ['sub', fontIdOf.sub, 0, 0, 'left'],
-    ['headerBar', fontIdOf.headerBold, grayFillId, 0, 'center'],
-    ['dataCell', fontIdOf.bodyNormal, 0, thinBorderId, 'center'],
-    ['footer', fontIdOf.footerBold, 0, 0, 'right'],
+    // [key, fontId, fillId, borderId, align, wrap]
+    ['title', fontIdOf.title, 0, 0, 'center', false],
+    ['sub', fontIdOf.sub, 0, 0, 'left', false],
+    ['headerBarTop', fontIdOf.headerBold, grayFillId, dividerBorderId, 'center', true], // row 4 — adds the divider line under it
+    ['headerBarBottom', fontIdOf.headerBold, grayFillId, 0, 'center', true], // row 5 — no extra border (divider already drawn above by row 4)
+    ['dataCell', fontIdOf.bodyNormal, 0, thinBorderId, 'center', false],
+    ['footer', fontIdOf.footerBold, 0, 0, 'left', false],
   ];
   const xfIndexOf = {};
   xfDefs.forEach((d, i) => { xfIndexOf[d[0]] = cellXfStart + i; });
-  const newCellXfsXml = xfDefs.map(([, fontId, fillId, borderId, align]) => {
+  const newCellXfsXml = xfDefs.map(([, fontId, fillId, borderId, align, wrap]) => {
     const applyBorder = borderId ? ' applyBorder="1"' : '';
-    return `<xf numFmtId="0" fontId="${fontId}" fillId="${fillId}" borderId="${borderId}" xfId="0" applyFont="1" applyFill="1"${applyBorder}><alignment horizontal="${align}" vertical="center" wrapText="1"/></xf>`;
+    const wrapAttr = wrap ? ' wrapText="1"' : '';
+    return `<xf numFmtId="0" fontId="${fontId}" fillId="${fillId}" borderId="${borderId}" xfId="0" applyFont="1" applyFill="1"${applyBorder}><alignment horizontal="${align}" vertical="center"${wrapAttr}/></xf>`;
   }).join('');
   stylesXml = stylesXml.replace(/<cellXfs count="(\d+)">/, (full, n) => `<cellXfs count="${parseInt(n, 10) + xfDefs.length}">`);
   stylesXml = stylesXml.replace('</cellXfs>', `${newCellXfsXml}</cellXfs>`);
@@ -88,7 +92,7 @@ async function applyDataSheetStyles(xlsxArrayBuffer, sheetNames) {
   zip.file('xl/styles.xml', stylesXml);
 
   // row role map shared by every data sheet (fixed company template layout)
-  const ROLE_BY_ROW = { 1: 'title', 2: 'sub', 4: 'headerBar', 5: 'headerBar', 16: 'footer' };
+  const ROLE_BY_ROW = { 1: 'title', 2: 'sub', 4: 'headerBarTop', 5: 'headerBarBottom', 16: 'footer' };
   for (let r = 6; r <= 15; r++) ROLE_BY_ROW[r] = 'dataCell';
 
   // row 2 also contains the date cell (보통 column C) which already carries its own
