@@ -120,7 +120,7 @@
 
       statusTxt.textContent = '엑셀 파일로 저장하는 중…';
       await nextFrame();
-      const rawOut = XLSX.write(workbook, { type: 'array', bookType: 'xlsx', cellStyles: true });
+      const rawOut = XLSX.write(workbook, { type: 'array', bookType: 'xlsx', cellStyles: true, bookSST: true });
 
       statusTxt.textContent = '인쇄 설정을 적용하는 중…';
       await nextFrame();
