@@ -145,6 +145,8 @@ function processWorkbook(XLSX, arrayBuffer) {
 
   // ---- 4. build cover ("갑지") sheet with computed (static) values ----
   const coverWs = buildCoverSheet(XLSX, periodOrder, periodRows, templateInfo);
+  const coverRowRoles = coverWs['!coverRowRoles'];
+  const coverNCols = coverWs['!coverNCols'];
   XLSX.utils.book_append_sheet(newWb, coverWs, '갑지');
 
   // move 갑지 to front
@@ -156,7 +158,7 @@ function processWorkbook(XLSX, arrayBuffer) {
 
   return {
     workbook: newWb,
-    meta: { periodOrder, sheetMeta, periodRows },
+    meta: { periodOrder, sheetMeta, periodRows, coverRowRoles, coverNCols },
   };
 }
 
@@ -246,9 +248,12 @@ function writeDataRows(ws, rows) {
 function buildCoverSheet(XLSX, periodOrder, periodRows, templateInfo) {
   const NCOLS = 1 + 1 + COVER_CATEGORY_COLS.length + 1; // label + 총수량 + categories + 기타
   const aoa = [];
+  const rowRoles = []; // 1-indexed sheet row -> role name (for downstream XML styling)
 
   aoa.push(['SPOOL 불출 수령 포장개수 집계 갑지']);
+  rowRoles.push({ row: 1, role: 'title' });
   aoa.push(['안성공장 (통합 외부제작 Shop)  |  업체별·구분별 포장 수량 집계']);
+  rowRoles.push({ row: 2, role: 'subtitle' });
   aoa.push([]);
 
   const merges = [];
@@ -276,6 +281,7 @@ function buildCoverSheet(XLSX, periodOrder, periodRows, templateInfo) {
     titleRow[0] = dateStr;
     titleRow[2] = `${p}  SPOOL 불출 현황`;
     aoa.push(titleRow);
+    rowRoles.push({ row: r + 1, role: 'periodBar' });
     merges.push({ s: { r, c: 0 }, e: { r, c: 1 } });
     merges.push({ s: { r, c: 2 }, e: { r, c: NCOLS - 1 } });
     r += 1;
@@ -283,6 +289,7 @@ function buildCoverSheet(XLSX, periodOrder, periodRows, templateInfo) {
     // header row
     const headerRow = ['신청업체', '총수량', ...COVER_CATEGORY_COLS, '기타'];
     aoa.push(headerRow);
+    rowRoles.push({ row: r + 1, role: 'colHeader' });
     r += 1;
 
     // compute totals
@@ -324,7 +331,7 @@ function buildCoverSheet(XLSX, periodOrder, periodRows, templateInfo) {
     const catGrandTotal = {};
     COVER_CATEGORY_COLS.forEach((c) => { catGrandTotal[c] = 0; });
 
-    COVER_VENDOR_ROWS.forEach((v) => {
+    COVER_VENDOR_ROWS.forEach((v, vi) => {
       const t = vendorTotals[v];
       const dataRow = [v, t.total];
       COVER_CATEGORY_COLS.forEach((c) => {
@@ -334,14 +341,16 @@ function buildCoverSheet(XLSX, periodOrder, periodRows, templateInfo) {
       const namedSum = COVER_CATEGORY_COLS.reduce((acc, c) => acc + t.byCategory[c], 0);
       dataRow.push(t.total - namedSum); // 기타 column for this vendor row
       aoa.push(dataRow);
+      rowRoles.push({ row: r + 1, role: vi % 2 === 1 ? 'vendorBand' : 'vendor' });
       grandTotal += t.total;
+      r += 1;
     });
-    r += COVER_VENDOR_ROWS.length;
 
     // 기타 vendor row
     const etcNamedSum = COVER_CATEGORY_COLS.reduce((acc, c) => acc + etcByCategory[c], 0);
     const etcRow = ['기타', etcTotal, ...COVER_CATEGORY_COLS.map((c) => etcByCategory[c]), etcTotal - etcNamedSum];
     aoa.push(etcRow);
+    rowRoles.push({ row: r + 1, role: 'etc' });
     r += 1;
     grandTotal += etcTotal;
     COVER_CATEGORY_COLS.forEach((c) => { catGrandTotal[c] += etcByCategory[c]; });
@@ -350,6 +359,7 @@ function buildCoverSheet(XLSX, periodOrder, periodRows, templateInfo) {
     const catGrandSum = COVER_CATEGORY_COLS.reduce((acc, c) => acc + catGrandTotal[c], 0);
     const totalRow = ['합계', grandTotal, ...COVER_CATEGORY_COLS.map((c) => catGrandTotal[c]), grandTotal - catGrandSum];
     aoa.push(totalRow);
+    rowRoles.push({ row: r + 1, role: 'total' });
     r += 1;
 
     aoa.push([]); // spacer
@@ -377,6 +387,8 @@ function buildCoverSheet(XLSX, periodOrder, periodRows, templateInfo) {
   const lastRow = aoa.length; // 1-indexed last row used
   const lastColLetter = XLSX.utils.encode_col(NCOLS - 1);
   ws['!printArea'] = `A1:${lastColLetter}${lastRow}`; // custom marker consumed by xlsx-print-patch.js
+  ws['!coverRowRoles'] = rowRoles; // custom marker consumed by cover-style-patch.js
+  ws['!coverNCols'] = NCOLS;
 
   return ws;
 }
